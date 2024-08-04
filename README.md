@@ -1,8 +1,6 @@
-# RetroFreak Toolkit
+# RetroFreak Toolkit NES Rom Decryption Bug Fix
 
-This is a toolkit intended to help players root their RetroFreak console to get more features out of it.
-
-The RetroFreak has an rk3066 SoC and uses the Rockchip image format for updates; these updates can be modified and repackaged using imgRePackerRK.
+This is an update to the original encrypt / decrypt logic with bug fix to handle NES / Famicom rom dump
 
 ##### Requirements:
 * Python 3
