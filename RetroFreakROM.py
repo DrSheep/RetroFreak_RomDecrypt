@@ -113,8 +113,6 @@ def encrypt_rom(dna: (bytes, bytearray), data: (bytes, bytearray)) -> (bytes, by
 def main() -> None:
 	global REQUEST_PUB_KEY, REQUEST_PUB_KEY_FILE, ROM_MAGIC, REQUEST_FILE
 
-	REQUEST_PUB_KEY = RSA.import_key(read_file(join("Keys", REQUEST_PUB_KEY_FILE)))
-
 	parser = ArgumentParser(description="A script to encrypt/decrypt ROM's to/from the RetroFreak")
 	parser.add_argument("ifile", type=str, help="The ROM to read from")
 	parser.add_argument("-o", type=str, help="The ROM file to write to")
