@@ -81,7 +81,7 @@ def decrypt_rom(dna: (bytes, bytearray), data: (bytes, bytearray)) -> (bytes, by
                 # Recombind header with rom
                 dec_data = NES_header + NES_rom
 
-        else:
+	else:
                 dec_crc = crc32(dec_data)
 
         print("Org CRC: " + str(hex(rom_crc)))
