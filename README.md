@@ -21,26 +21,9 @@ persist.service.debuggable=1
 persist.sys.usb.config=adb
 ```
 
-##### RetroFreak.py Usage:
-```
-usage: RetroFreak.py [-h] [-i IN_FILE] [-o OUT_DIR] [-l] [-e] [-d]
-
-A script to make unpacking RetroFreak updates easier (or even possible in the first place)
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -i IN_FILE, --in-file IN_FILE
-                        The update file you want to unpack
-  -o OUT_DIR, --out-dir OUT_DIR
-                        The directory you want to extract the update to
-  -l, --list            List files in the update package
-  -e, --extract         Extract files from the update package
-  -d, --debug           Print debug info
-```
-
 ##### RetroFreakROM.py Usage:
 ```
-usage: RetroFreakROM.py [-h] [-o O] [-s SERIAL] [-k KEYFILE] ifile
+usage: RetroFreakROM.py [-h] [-o O] [-s SERIAL] ifile
 
 A script to encrypt/decrypt ROM's to/from the RetroFreak
 
@@ -52,8 +35,6 @@ optional arguments:
   -o O                  The ROM file to write to
   -s SERIAL, --serial SERIAL
                         The serial number you want to use
-  -k KEYFILE, --keyfile KEYFILE
-                        The update request file to read from
 ```
 
 ##### Credits:
