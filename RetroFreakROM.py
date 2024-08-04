@@ -17,9 +17,11 @@ ROM_MAGIC = b"RFRK"
 ROM_SECRET = unhexlify("6F5BC7F1068C3D60D6A62E757739453A")
 REQUEST_MAGIC = b"WPR2"
 REQUEST_SECRET = unhexlify("D7A1066CE2DC0D5A8636D1E8D0965E90")
-REQUEST_FILE = "retrofreak-update-request.dat"
-REQUEST_PUB_KEY_FILE = "request.pub"
+REQUEST_FILE = "serial.txt"
+
 REQUEST_SIZE = 192
+
+NES_MAGIC = b"NES\x1a"
 
 REQUEST_PUB_KEY = None
 
@@ -33,25 +35,7 @@ def read_file(filename: str) -> bytes:
 def write_file(filename: str, data: (bytes, bytearray)) -> None:
 	with open(filename, "wb") as f:
 		f.write(data)
-
-def decrypt_update_request(data: (bytes, bytearray)) -> (bytes, bytearray):
-	global REQUEST_SECRET, REQUEST_MAGIC, REQUEST_PUB_KEY
-
-	assert len(data) == REQUEST_SIZE, "Invalid update request size"
-	iv = data[:16]
-	cipher = AES.new(REQUEST_SECRET, AES.MODE_CBC, iv)
-	enc_data = data[16:]  # array + signature
-	dec_data = unpad(cipher.decrypt(enc_data), AES.block_size)
-	body = dec_data[:-REQUEST_PUB_KEY.size_in_bytes()]  # UNIQUE_MAGIC + DNA
-	signature = dec_data[-REQUEST_PUB_KEY.size_in_bytes():]
-	# verify file magic
-	assert body[:4] == REQUEST_MAGIC, "Invalid update request magic"
-	# verify signature
-	verifier = PKCS1_v1_5.new(REQUEST_PUB_KEY)
-	assert verifier.verify(SHA1.new(body), signature), "Invalid signature"
-	(magic, dna, sys_fw_ver, ver_code, pcba_rev) = unpack("<4s 16s 3I", body)
-	return dna
-
+		
 def derive_rom_key(dna: (bytes, bytearray)) -> bytes:
 	global ROM_SECRET
 
@@ -71,7 +55,39 @@ def decrypt_rom(dna: (bytes, bytearray), data: (bytes, bytearray)) -> (bytes, by
 	(magic, rom_crc, rom_size) = unpack_from("<4s 2I", dec_data, 0)
 	assert magic == ROM_MAGIC, "Invalid magic"
 	dec_data = cipher.decrypt(data[0x200:0x200 + rom_size])
-	assert rom_crc == crc32(dec_data), "Invalid ROM checksum"
+	if dec_data[:4] == NES_MAGIC: # Adding NES rom handler missing from original code
+
+                # Decouple iNES header from rom body
+                NES_header = dec_data[:0x10]
+                NES_rom = dec_data[0x10:]
+
+                # Get correct rom CRC by ignoring iNES header
+                dec_crc = crc32(NES_rom)
+
+                # Getting and fixing iNES header and flags
+                flag_6 = NES_header[6]
+                flag_9 = NES_header[9]
+                
+                # Inspect and fix error in iNES flag 9 as it can only be 0 or 1
+                if flag_9 > 0x01:
+                        print("Bad iNES Header: " + str(NES_header))
+                        NES_header = NES_header[:9] + b'\x00' + NES_header[10:] # Forcing flag 9 as NTSC in iNES header
+
+                # Fixing wrong first bit for flag 6
+                flag_6 ^= 1 << 0 # flipped the first bit
+                NES_header = NES_header[:6] + flag_6.to_bytes(1,'little') + NES_header[7:]
+                print("Fixed Header: " + str(NES_header))
+    
+                # Recombind header with rom
+                dec_data = NES_header + NES_rom
+
+        else:
+                dec_crc = crc32(dec_data)
+
+        print("Org CRC: " + str(hex(rom_crc)))
+        print("Dec CRC: " + str(hex(dec_crc)))
+        assert rom_crc == dec_crc, "Invalid ROM checksum"
+
 	return dec_data
 
 def encrypt_rom(dna: (bytes, bytearray), data: (bytes, bytearray)) -> (bytes, bytearray):
@@ -80,6 +96,14 @@ def encrypt_rom(dna: (bytes, bytearray), data: (bytes, bytearray)) -> (bytes, by
 	key = derive_rom_key(dna)
 	hdr_buf = bytearray(urandom(0x200))
 	(iv,) = unpack_from("16s", hdr_buf, 0x10)
+
+	if data[:4] == NES_MAGIC: # Get correct rom CRC by ignoring iNES header
+                data_crc = crc32(data[0x10:])
+        else:
+                data_crc = crc32(data)
+
+        print("Rom CRC: " + str(hex(data_crc)))
+        
 	pack_into("<4s", hdr_buf, 0, ROM_MAGIC)
 	pack_into("<4s 2I", hdr_buf, 0x20, ROM_MAGIC, crc32(data), len(data))
 	cipher = AES.new(key, AES.MODE_CBC, iv)
@@ -95,7 +119,8 @@ def main() -> None:
 	parser.add_argument("ifile", type=str, help="The ROM to read from")
 	parser.add_argument("-o", type=str, help="The ROM file to write to")
 	parser.add_argument("-s", "--serial", type=str, help="The serial number you want to use")
-	parser.add_argument("-k", "--keyfile", type=str, default=REQUEST_FILE, help="The update request file to read from")
+	parser.add_argument("-k", "--keyfile", type=str, default=REQUEST_FILE, help="The serial number in serial.txt file to read from")
+	
 	args = parser.parse_args()
 
 	assert isfile(args.ifile), "The specified ROM file doesn't exist"
@@ -103,7 +128,7 @@ def main() -> None:
 	if args.serial:
 		dna = unhexlify(args.serial)
 	elif args.keyfile and isfile(args.keyfile):
-		dna = decrypt_update_request(read_file(args.keyfile))
+		dna = unhexlify(read_file(args.keyfile))
 	else:
 		raise FileNotFoundError("-s (--serial) or -k (--keyfile) is required but not provided")
 
